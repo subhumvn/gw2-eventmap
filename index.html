@@ -1,1679 +1,224 @@
-<!DOCTYPE html>
-
+<!doctype html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GW2 — Карта текущих ивентов</title>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GW2 Event Map — modern</title>
 <style>
-  :root {
-    --bg: #14110d;
-    --panel: #1e1a14;
-    --panel2: #26201a;
-    --gold: #c9a227;
-    --gold-soft: #8a7326;
-    --text: #e9e2d0;
-    --muted: #a89b7d;
-    --accent: #d34b3d;
-    --active: #4caf6a;
-    --error: #d96b5f;
-    --info: #6fa8dc;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: "Segoe UI", Tahoma, sans-serif;
-  }
-
-  header {
-    padding: 14px 20px;
-    background: linear-gradient(180deg, #221c14, #16130e);
-    border-bottom: 2px solid var(--gold-soft);
-  }
-
-  header h1 {
-    margin: 0;
-    font-size: 20px;
-    letter-spacing: .5px;
-    color: var(--gold);
-  }
-
-  header p {
-    margin: 5px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .controls {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 12px 20px;
-    background: var(--panel);
-    align-items: center;
-    border-bottom: 1px solid #332c20;
-  }
-
-  .control {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-  }
-
-  select,
-  button,
-  input {
-    background: var(--panel2);
-    color: var(--text);
-    border: 1px solid var(--gold-soft);
-    border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 13px;
-  }
-
-  select {
-    min-width: 230px;
-  }
-
-  input {
-    min-width: 180px;
-  }
-
-  button {
-    cursor: pointer;
-    color: var(--gold);
-  }
-
-  button:hover {
-    background: #332b1e;
-  }
-
-  button.toggled {
-    background: var(--gold-soft);
-    color: #1a1508;
-  }
-
-  .status {
-    font-size: 12px;
-    color: var(--muted);
-    margin-left: auto;
-  }
-
-  .status.ok {
-    color: var(--active);
-  }
-
-  .status.error {
-    color: var(--error);
-  }
-
-  .status.info {
-    color: var(--info);
-  }
-
-  main {
-    display: flex;
-    gap: 14px;
-    padding: 14px 20px;
-    flex-wrap: wrap;
-  }
-
-  .mapwrap {
-    flex: 2;
-    min-width: 340px;
-    background: var(--panel);
-    border: 1px solid #332c20;
-    border-radius: 8px;
-    padding: 10px;
-    position: relative;
-  }
-
-  #mapCanvas {
-    width: 100%;
-    min-height: 500px;
-    background: #18251a;
-    border-radius: 6px;
-    display: block;
-    position: relative;
-    overflow: hidden;
-  }
-
-  #mapImage {
-    width: 100%;
-    height: auto;
-    display: block;
-    background: #1a2a1a;
-    user-select: none;
-  }
-
-  #markerLayer {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .marker {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    margin-left: -7px;
-    margin-top: -7px;
-    border-radius: 50%;
-    background: var(--active);
-    border: 2px solid #071107;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.2);
-    cursor: pointer;
-    pointer-events: auto;
-    transition: transform .12s, background .12s;
-  }
-
-  .marker:hover,
-  .marker.hl {
-    background: var(--accent);
-    transform: scale(1.45);
-  }
-
-  .marker-label {
-    position: absolute;
-    transform: translate(10px, -50%);
-    white-space: nowrap;
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #e4f2e4;
-    font-size: 10px;
-    text-shadow:
-      -1px -1px 0 #071107,
-       1px -1px 0 #071107,
-      -1px  1px 0 #071107,
-       1px  1px 0 #071107;
-    pointer-events: none;
-  }
-
-  .list {
-    flex: 1;
-    min-width: 300px;
-    background: var(--panel);
-    border: 1px solid #332c20;
-    border-radius: 8px;
-    padding: 10px;
-    max-height: 650px;
-    overflow: auto;
-  }
-
-  .list h3 {
-    margin: 2px 0 4px;
-    color: var(--gold);
-    font-size: 14px;
-  }
-
-  .list-subtitle {
-    color: var(--muted);
-    font-size: 11px;
-    margin-bottom: 10px;
-  }
-
-  .evt-row {
-    padding: 8px;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    background: var(--panel2);
-    cursor: pointer;
-    border: 1px solid transparent;
-    font-size: 13px;
-  }
-
-  .evt-row:hover,
-  .evt-row.hl {
-    border-color: var(--gold);
-  }
-
-  .evt-row .lvl {
-    color: var(--muted);
-    font-size: 11px;
-    margin-top: 3px;
-  }
-
-  .empty {
-    color: var(--muted);
-    font-size: 13px;
-    text-align: center;
-    padding: 30px 10px;
-  }
-
-  .warning {
-    padding: 10px;
-    border: 1px solid #6d4d20;
-    border-radius: 6px;
-    background: #2b2115;
-    color: #d7bd83;
-    font-size: 12px;
-    line-height: 1.45;
-    margin-bottom: 10px;
-  }
-
-  .zone-info {
-    margin-top: 8px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .zone-info strong {
-    color: var(--text);
-  }
-
-  .hint {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 8px;
-    line-height: 1.45;
-  }
-
-  code {
-    color: #d7c88b;
-  }
-
-  .loading {
-    opacity: .65;
-    pointer-events: none;
-  }
+:root{color-scheme:dark;--bg:#0b1117;--panel:#121a22;--panel2:#18232d;--line:#2b3a47;--text:#e8eef3;--muted:#91a0ad;--accent:#55b6ff;--ok:#61d095;--warn:#f0bd5a;--bad:#ff7474}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{padding:14px 18px;border-bottom:1px solid var(--line);background:#0d151d;position:sticky;top:0;z-index:10}
+h1{margin:0;font-size:18px} .sub{color:var(--muted);font-size:12px;margin-top:3px}
+.toolbar{display:grid;grid-template-columns:180px 1fr 1fr auto;gap:10px;padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+select,input,button{width:100%;background:#0d151d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px}
+button{cursor:pointer}button:hover{border-color:#4b6578}
+main{display:grid;grid-template-columns:minmax(0,1fr) 340px;min-height:calc(100vh - 111px)}
+.mapWrap{position:relative;overflow:hidden;background:#0b1510;min-height:620px}
+#mapViewport{position:absolute;inset:0;overflow:auto;padding:18px}
+#mapStage{position:relative;margin:auto;width:min(100%,1100px);min-width:600px;background:#15251a;box-shadow:0 8px 35px #0008}
+#mapImage{display:block;width:100%;height:auto;min-height:360px;object-fit:contain;background:#17301d}
+#mapFallback{display:none;padding:80px 30px;text-align:center;color:var(--muted);min-height:420px}
+.marker{position:absolute;transform:translate(-50%,-100%);width:18px;height:18px;border-radius:50%;background:#ff5c5c;border:2px solid #fff;box-shadow:0 2px 9px #000;cursor:pointer}
+.marker.active{background:var(--ok);width:21px;height:21px}
+.marker span{position:absolute;left:24px;top:-4px;white-space:nowrap;background:#0b111ddd;padding:3px 6px;border-radius:4px;font-size:11px;pointer-events:none}
+.sidebar{border-left:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px;margin-bottom:10px}
+.card h2{font-size:14px;margin:0 0 8px}.muted{color:var(--muted)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.event{padding:9px 0;border-top:1px solid var(--line)}.event:first-child{border-top:0}
+.eventName{font-weight:600}.pill{display:inline-block;padding:2px 6px;border-radius:99px;background:#263544;color:#b9c7d2;font-size:10px;margin-left:5px}
+.small{font-size:12px}.links a{color:var(--accent);text-decoration:none}.links a:hover{text-decoration:underline}
+@media(max-width:900px){main{grid-template-columns:1fr}.sidebar{border-left:0;border-top:1px solid var(--line)}.toolbar{grid-template-columns:1fr 1fr}.mapWrap{min-height:500px}}
 </style>
-
 </head>
-
 <body>
-
 <header>
-  <h1>Guild Wars 2 — Карта текущих ивентов</h1>
-  <p>
-    Современная структура GW2 API v2 для миров и зон.
-    Live-состояния событий загружаются отдельно.
-  </p>
+  <h1>GW2 Event Map</h1>
+  <div class="sub">Zone data: Guild Wars 2 API v2 · map artwork: GW2 Wiki · dynamic event state: not provided by the current official API</div>
 </header>
 
-<div class="controls">
-
-  <label class="control">
-    Регион:
-    <select id="continentSel">
-      <option value="1">Tyria</option>
-      <option value="2">The Mists</option>
-    </select>
-  </label>
-
-  <label class="control">
-    Зона:
-    <select id="zoneSel">
-      <option>Загрузка зон…</option>
-    </select>
-  </label>
-
-  <label class="control">
-    Сервер:
-    <select id="worldSel">
-      <option>Загрузка миров…</option>
-    </select>
-  </label>
-
-  <button id="flipBtn">
-    Перевернуть Y
-  </button>
-
-  <button id="autoBtn" class="toggled">
-    Автообновление: вкл
-  </button>
-
-  <button id="reloadBtn">
-    Обновить
-  </button>
-
-<span class="status" id="status">Инициализация…</span>
-
-</div>
+<section class="toolbar">
+  <div>
+    <label>Континент</label>
+    <select id="continent"><option value="1">Tyria</option><option value="2">The Mists</option></select>
+  </div>
+  <div>
+    <label>Zone / Map</label>
+    <select id="zone"><option>Загрузка…</option></select>
+  </div>
+  <div>
+    <label>Поиск зоны</label>
+    <input id="search" placeholder="Например: Dragonfall">
+  </div>
+  <button id="reload">Обновить</button>
+</section>
 
 <main>
+  <section class="mapWrap">
+    <div id="mapViewport">
+      <div id="mapStage">
+        <img id="mapImage" alt="Map">
+        <div id="mapFallback">Карта изображения не найдена.<br>Можно открыть страницу зоны на GW2 Wiki.</div>
+        <div id="markers"></div>
+      </div>
+    </div>
+  </section>
 
-  <div class="mapwrap">
-
-```
-<div id="mapCanvas">
-  <img id="mapImage" alt="Карта GW2">
-  <div id="markerLayer"></div>
-</div>
-
-<div class="zone-info" id="zoneInfo">
-  Зона не выбрана.
-</div>
-
-<div class="hint">
-  Координаты live-событий преобразуются из event/map coordinates
-  через <code>map_rect</code>. Карта использует официальный tile service GW2.
-</div>
-```
-
-  </div>
-
-  <div class="list">
-
-```
-<h3 id="listTitle">
-  Активные ивенты
-</h3>
-
-<div class="list-subtitle" id="listSubtitle">
-  Выберите зону.
-</div>
-
-<div id="apiWarning"></div>
-
-<div id="evtList" class="empty">
-  Загрузка…
-</div>
-```
-
-  </div>
-
+  <aside class="sidebar">
+    <div class="card" id="info">Загрузка данных…</div>
+    <div class="card">
+      <h2>События</h2>
+      <div class="small muted">
+        Старый <code>/v1/events</code> намеренно не используется: он привязан к устаревшей модели world/server и помечен GW2 Wiki как obsolete после введения megaserver.
+      </div>
+      <div id="events" style="margin-top:8px"></div>
+    </div>
+    <div class="card links" id="wikiLinks"></div>
+  </aside>
 </main>
 
 <script>
-"use strict";
+const API = "https://api.guildwars2.com/v2";
+const WIKI = "https://wiki.guildwars2.com/wiki/";
+const WIKI_FILE = "https://wiki.guildwars2.com/wiki/Special:Redirect/file/";
+const state = { maps: [], selected: null };
 
-/*
- * ============================================================
- * GW2 EVENT MAP — MODERN ARCHITECTURE
- * ============================================================
- *
- * Static data:
- *   /v2/worlds
- *   /v2/maps
- *
- * Live events:
- *   /v1/events.json
- *
- * Why v1 remains here:
- *   There is currently no /v2/events endpoint providing the
- *   live event-state feed required by this application.
- *
- * If /v1/events.json returns 503, the application does NOT
- * crash. Zones/maps remain usable and a clear warning is shown.
- */
+const $ = id => document.getElementById(id);
 
-const API_V2 = "https://api.guildwars2.com/v2";
-const API_V1 = "https://api.guildwars2.com/v1";
-
-const TILE_BASE = "https://tiles.guildwars2.com";
-
-/*
- * Cache lifetime.
- *
- * Maps and worlds are static enough that there is no reason
- * to request them every 30 seconds.
- */
-const STATIC_CACHE_KEY = "gw2-eventmap-static-v2";
-const STATIC_CACHE_TTL = 1000 * 60 * 60 * 12;
-
-/*
- * Application state.
- */
-let worlds = [];
-let maps = [];
-let zones = [];
-
-let worldId = null;
-let continentId = 1;
-let mapId = null;
-
-let worldEvents = [];
-let eventDetails = null;
-
-let flipY = false;
-let autoRefresh = true;
-let refreshTimer = null;
-
-let currentMarkers = [];
-
-/*
- * DOM.
- */
-const continentSel = document.getElementById("continentSel");
-const zoneSel = document.getElementById("zoneSel");
-const worldSel = document.getElementById("worldSel");
-
-const flipBtn = document.getElementById("flipBtn");
-const autoBtn = document.getElementById("autoBtn");
-const reloadBtn = document.getElementById("reloadBtn");
-
-const statusEl = document.getElementById("status");
-
-const mapCanvas = document.getElementById("mapCanvas");
-const mapImage = document.getElementById("mapImage");
-const markerLayer = document.getElementById("markerLayer");
-
-const zoneInfo = document.getElementById("zoneInfo");
-
-const listTitle = document.getElementById("listTitle");
-const listSubtitle = document.getElementById("listSubtitle");
-const evtList = document.getElementById("evtList");
-const apiWarning = document.getElementById("apiWarning");
-
-
-/* ============================================================
- * Utility
- * ============================================================ */
-
-function setStatus(text, type = "") {
-  statusEl.textContent = text;
-  statusEl.className = "status " + type;
+async function getJSON(url){
+  const r = await fetch(url, {cache:"no-store"});
+  if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function wikiFile(name){
+  // GW2 Wiki uses normal zone-map filenames such as "Dragonfall map.jpg".
+  return WIKI_FILE + encodeURIComponent(name + " map.jpg");
 }
 
+function wikiPage(name){
+  return WIKI + encodeURIComponent(name.replaceAll(" ","_"));
+}
 
-/* ============================================================
- * HTTP
- * ============================================================ */
+function mapIsZoneLike(m){
+  // Public maps are the useful open-world set. Instances, guild halls etc. are excluded.
+  return m && m.type === "Public" && Number.isFinite(m.id) && m.name;
+}
 
-async function fetchJson(url, options = {}) {
+function renderZoneList(){
+  const q = $("search").value.trim().toLowerCase();
+  const continent = Number($("continent").value);
+  const list = state.maps
+    .filter(m => m.continent_id === continent && mapIsZoneLike(m))
+    .filter(m => !q || m.name.toLowerCase().includes(q))
+    .sort((a,b)=>a.name.localeCompare(b.name,"en"));
 
-  const {
-    retries = 2,
-    timeout = 15000
-  } = options;
-
-  let lastError = null;
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-
-    const controller = new AbortController();
-
-    const timer = setTimeout(
-      () => controller.abort(),
-      timeout
-    );
-
-    try {
-
-      const response = await fetch(url, {
-        signal: controller.signal,
-        cache: "no-store"
-      });
-
-      clearTimeout(timer);
-
-      if (!response.ok) {
-
-        let message = "";
-
-        try {
-          const body = await response.json();
-
-          if (body && body.text) {
-            message = body.text;
-          }
-
-        } catch (_) {
-          /* Response is not JSON. */
-        }
-
-        const error = new Error(
-          `HTTP ${response.status}` +
-          (message ? ` — ${message}` : "")
-        );
-
-        error.status = response.status;
-        throw error;
-      }
-
-      return await response.json();
-
-    } catch (error) {
-
-      clearTimeout(timer);
-      lastError = error;
-
-      /*
-       * Retry only transient errors.
-       */
-      const transient =
-        error.name === "AbortError" ||
-        error.status === 429 ||
-        error.status === 500 ||
-        error.status === 502 ||
-        error.status === 503 ||
-        error.status === 504;
-
-      if (!transient || attempt >= retries) {
-        throw error;
-      }
-
-      await sleep(1000 * (attempt + 1));
-    }
+  const sel = $("zone");
+  const old = Number(sel.value);
+  sel.innerHTML = "";
+  for(const m of list){
+    const o=document.createElement("option");
+    o.value=m.id;
+    o.textContent=`${m.name} (${m.min_level ?? "?"}–${m.max_level ?? "?"})`;
+    sel.appendChild(o);
   }
-
-  throw lastError;
-}
-
-
-/* ============================================================
- * STATIC DATA
- * ============================================================ */
-
-function saveStaticCache(data) {
-
-  try {
-
-    localStorage.setItem(
-      STATIC_CACHE_KEY,
-      JSON.stringify({
-        timestamp: Date.now(),
-        data
-      })
-    );
-
-  } catch (_) {
-    /* localStorage may be unavailable. */
-  }
-}
-
-
-function loadStaticCache() {
-
-  try {
-
-    const raw = localStorage.getItem(STATIC_CACHE_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-
-    if (
-      !parsed ||
-      !parsed.timestamp ||
-      !parsed.data
-    ) {
-      return null;
-    }
-
-    if (
-      Date.now() - parsed.timestamp >
-      STATIC_CACHE_TTL
-    ) {
-      return null;
-    }
-
-    return parsed.data;
-
-  } catch (_) {
-    return null;
-  }
-}
-
-
-async function loadStaticData() {
-
-  setStatus("Загружаю справочники…", "info");
-
-  const cached = loadStaticCache();
-
-  if (cached) {
-
-    worlds = cached.worlds || [];
-    maps = cached.maps || [];
-
-    setStatus("Справочники загружены из кэша.", "ok");
-
-    /*
-     * Refresh in background.
-     */
-    refreshStaticDataInBackground();
-
+  if(list.some(m=>m.id===old)) sel.value=String(old);
+  if(!list.length){
+    sel.innerHTML='<option>Нет подходящих карт</option>';
+    state.selected=null;
     return;
   }
-
-  await refreshStaticData();
+  const chosen=list.find(m=>m.id===Number(sel.value)) || list[0];
+  sel.value=String(chosen.id);
+  selectZone(chosen.id);
 }
 
+function clearMarkers(){ $("markers").innerHTML=""; }
 
-async function refreshStaticData() {
-
-  /*
-   * v2/worlds and v2/maps are independent endpoints.
-   */
-  const [worldData, mapData] = await Promise.all([
-    fetchJson(API_V2 + "/worlds?lang=en", {
-      retries: 3
-    }),
-
-    fetchJson(API_V2 + "/maps?ids=all&lang=en", {
-      retries: 3
-    })
-  ]);
-
-  worlds = Array.isArray(worldData)
-    ? worldData
-    : [];
-
-  maps = Array.isArray(mapData)
-    ? mapData
-    : [];
-
-  saveStaticCache({
-    worlds,
-    maps
-  });
-
-  setStatus("Справочники API v2 загружены.", "ok");
+function renderInfo(m){
+  $("info").innerHTML = `
+    <h2>${esc(m.name)}</h2>
+    <div class="small">Map ID: <b>${m.id}</b></div>
+    <div class="small">Region: <b>${esc(m.region_name || "—")}</b></div>
+    <div class="small">Continent: <b>${esc(m.continent_name || "—")}</b></div>
+    <div class="small">Level: <b>${m.min_level ?? "—"}–${m.max_level ?? "—"}</b></div>
+    <div class="small">Type: <b>${esc(m.type || "—")}</b></div>
+    <div class="small muted" style="margin-top:7px">Map rectangle: ${esc(JSON.stringify(m.map_rect || "—"))}</div>
+  `;
 }
 
-
-async function refreshStaticDataInBackground() {
-
-  try {
-    await refreshStaticData();
-    populateWorlds();
-    populateZones();
-  } catch (error) {
-    /*
-     * Existing cache remains usable.
-     */
-    console.warn(
-      "Background static data refresh failed:",
-      error
-    );
-  }
+function renderEvents(m){
+  // Static, deliberately non-live examples. Add more entries here as desired.
+  const staticEvents = {
+    1317: [
+      {name:"The Battle of Dragonfall", kind:"meta event", note:"Составной meta-event Dragonfall; текущее состояние из официального API не доступно."}
+    ]
+  };
+  const arr = staticEvents[m.id] || [];
+  $("events").innerHTML = arr.length
+    ? arr.map(e=>`<div class="event"><div class="eventName">${esc(e.name)} <span class="pill">${esc(e.kind)}</span></div><div class="small muted">${esc(e.note)}</div></div>`).join("")
+    : `<div class="small muted">Для этой зоны в локальном справочнике нет статических событий.</div>`;
 }
 
-
-/* ============================================================
- * WORLDS
- * ============================================================ */
-
-function populateWorlds() {
-
-  worldSel.innerHTML = "";
-
-  const sorted = worlds
-    .slice()
-    .sort((a, b) =>
-      String(a.name).localeCompare(
-        String(b.name),
-        "en"
-      )
-    );
-
-  sorted.forEach(world => {
-
-    const option = document.createElement("option");
-
-    option.value = world.id;
-
-    const region =
-      Number(world.id) >= 2000
-        ? "EU"
-        : "NA";
-
-    option.textContent =
-      `${world.name} (${region})`;
-
-    worldSel.appendChild(option);
-  });
-
-  /*
-   * Preserve the user's existing choice.
-   * Otherwise choose EU.
-   */
-  if (
-    worldId &&
-    sorted.some(w => w.id === worldId)
-  ) {
-    worldSel.value = worldId;
-    return;
-  }
-
-  const eu = sorted.find(
-    world => Number(world.id) >= 2000
-  );
-
-  worldId =
-    eu?.id ??
-    sorted[0]?.id ??
-    null;
-
-  if (worldId !== null) {
-    worldSel.value = worldId;
-  }
+function renderLinks(m){
+  $("wikiLinks").innerHTML = `
+    <h2>Источники</h2>
+    <div><a target="_blank" rel="noopener" href="${wikiPage(m.name)}">Открыть ${esc(m.name)} на GW2 Wiki</a></div>
+    <div><a target="_blank" rel="noopener" href="${API}/maps/${m.id}">API v2 /maps/${m.id}</a></div>
+  `;
 }
 
-
-/* ============================================================
- * ZONES
- * ============================================================ */
-
-/*
- * The v2 maps endpoint returns:
- *
- *   id
- *   name
- *   type
- *   region_id
- *   region_name
- *   continent_id
- *   continent_name
- *   map_rect
- *   continent_rect
- *
- * We use public maps with valid map_rect/continent data.
- *
- * This intentionally avoids instance/story maps and guild
- * instances where possible.
- */
-function isSelectableZone(map) {
-
-  if (!map) {
-    return false;
-  }
-
-  if (!map.id || !map.name) {
-    return false;
-  }
-
-  if (!map.map_rect) {
-    return false;
-  }
-
-  if (!map.continent_id) {
-    return false;
-  }
-
-  /*
-   * Public is the normal explorable/open-world type.
-   *
-   * If the API omits type for a map, we don't reject it solely
-   * for that reason.
-   */
-  if (
-    map.type &&
-    map.type !== "Public"
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-
-function populateZones() {
-
-  const continentMaps = maps
-    .filter(map =>
-      Number(map.continent_id) === Number(continentId)
-    )
-    .filter(isSelectableZone);
-
-  /*
-   * Deduplicate map IDs.
-   */
-  const unique = new Map();
-
-  continentMaps.forEach(map => {
-    unique.set(Number(map.id), map);
-  });
-
-  zones = Array.from(unique.values())
-    .sort((a, b) => {
-
-      const regionA =
-        String(a.region_name || "");
-
-      const regionB =
-        String(b.region_name || "");
-
-      const regionCompare =
-        regionA.localeCompare(
-          regionB,
-          "en"
-        );
-
-      if (regionCompare !== 0) {
-        return regionCompare;
-      }
-
-      return String(a.name).localeCompare(
-        String(b.name),
-        "en"
-      );
-    });
-
-  zoneSel.innerHTML = "";
-
-  if (!zones.length) {
-
-    zoneSel.innerHTML =
-      "<option value=''>Зоны не найдены</option>";
-
-    mapId = null;
-
-    return;
-  }
-
-  /*
-   * Group options by region.
-   */
-  let lastRegion = null;
-  let group = null;
-
-  zones.forEach(zone => {
-
-    const region =
-      zone.region_name ||
-      "Other";
-
-    if (region !== lastRegion) {
-
-      group =
-        document.createElement("optgroup");
-
-      group.label = region;
-
-      zoneSel.appendChild(group);
-
-      lastRegion = region;
-    }
-
-    const option =
-      document.createElement("option");
-
-    option.value = zone.id;
-
-    option.textContent =
-      `${zone.name} ` +
-      `(${zone.min_level ?? "?"}–${zone.max_level ?? "?"})`;
-
-    group.appendChild(option);
-  });
-
-  /*
-   * Preserve selected map if it still exists.
-   */
-  const selectedExists =
-    mapId &&
-    zones.some(
-      zone => Number(zone.id) === Number(mapId)
-    );
-
-  if (!selectedExists) {
-    mapId = Number(zones[0].id);
-  }
-
-  zoneSel.value = String(mapId);
-
-  renderSelectedZone();
-}
-
-
-/* ============================================================
- * MAP
- * ============================================================ */
-
-function getSelectedZone() {
-
-  return zones.find(
-    zone =>
-      Number(zone.id) === Number(mapId)
-  ) || null;
-}
-
-
-function buildTileUrl(
-  continent,
-  floor,
-  zoom,
-  x,
-  y
-) {
-
-  return (
-    `${TILE_BASE}/` +
-    `${continent}/` +
-    `${floor}/` +
-    `${zoom}/` +
-    `${x}/` +
-    `${y}.jpg`
-  );
-}
-
-
-/*
- * The official tile service uses continent/floor/zoom/x/y.
- *
- * We display a useful background when a matching tile floor
- * exists. Some newer maps are not represented in the legacy
- * tile service, so a missing tile is not treated as an API
- * failure.
- */
-function getMapFloor(zone) {
-
-  if (!zone) {
-    return null;
-  }
-
-  return (
-    zone.default_floor ??
-    (Array.isArray(zone.floors)
-      ? zone.floors[0]
-      : null)
-  );
-}
-
-
-function renderSelectedZone() {
-
-  const zone = getSelectedZone();
-
-  clearMarkers();
-
-  if (!zone) {
-
-    mapImage.removeAttribute("src");
-
-    zoneInfo.textContent =
-      "Зона не выбрана.";
-
-    return;
-  }
-
-  zoneInfo.innerHTML =
-    `<strong>${escapeHtml(zone.name)}</strong>` +
-    ` · ${escapeHtml(zone.region_name || "—")}` +
-    ` · ${zone.min_level ?? "?"}–${zone.max_level ?? "?"}`;
-
-  listTitle.textContent =
-    "Активные ивенты — " +
-    zone.name;
-
-  listSubtitle.textContent =
-    `Map ID: ${zone.id}`;
-
-  renderMapBackground(zone);
-
-  renderCurrentEvents();
-}
-
-
-function renderMapBackground(zone) {
-
-  /*
-   * Clear old background.
-   */
-  mapImage.removeAttribute("src");
-
-  const floor =
-    getMapFloor(zone);
-
-  /*
-   * If the API has no floor information, simply use the
-   * dark background.
-   */
-  if (
-    floor === null ||
-    floor === undefined
-  ) {
-    return;
-  }
-
-  /*
-   * We deliberately use a conservative zoom.
-   *
-   * The image is only a visual backdrop; event coordinates
-   * are positioned independently using map_rect.
-   */
-  const zoom = 4;
-
-  /*
-   * Rather than trying to calculate every tile here, we use
-   * a single placeholder background if the tile service does
-   * not have a simple map image for this zone.
-   *
-   * The marker coordinate system below remains accurate.
-   */
-
-  mapImage.style.display = "none";
-}
-
-
-/* ============================================================
- * EVENT COORDINATES
- * ============================================================ */
-
-/*
- * Convert event coordinates into normalized coordinates
- * inside map_rect.
- *
- * Event coordinate Y points in the opposite direction from
- * the visual top-to-bottom coordinate system.
- */
-function eventToNormalized(
-  mapRect,
-  center
-) {
-
-  if (
-    !Array.isArray(mapRect) ||
-    mapRect.length !== 2 ||
-    !Array.isArray(center) ||
-    center.length < 2
-  ) {
-    return null;
-  }
-
-  const minX =
-    Number(mapRect[0][0]);
-
-  const maxX =
-    Number(mapRect[1][0]);
-
-  const minY =
-    Number(mapRect[0][1]);
-
-  const maxY =
-    Number(mapRect[1][1]);
-
-  const x =
-    Number(center[0]);
-
-  const y =
-    Number(center[1]);
-
-  const nx =
-    (x - minX) /
-    ((maxX - minX) || 1);
-
-  /*
-   * GW2 map Y increases in the opposite direction
-   * to the screen Y axis.
-   */
-  let ny =
-    1 -
-    ((y - minY) /
-    ((maxY - minY) || 1));
-
-  let finalX = nx;
-  let finalY = ny;
-
-  if (flipY) {
-    finalY = 1 - finalY;
-  }
-
-  return {
-    x: Math.max(0, Math.min(1, finalX)),
-    y: Math.max(0, Math.min(1, finalY))
+function loadMapImage(m){
+  const img=$("mapImage"), fallback=$("mapFallback");
+  fallback.style.display="none";
+  img.style.display="block";
+  img.src=wikiFile(m.name);
+  img.onload=()=>{ img.style.display="block"; fallback.style.display="none"; };
+  img.onerror=()=>{
+    // For older maps the official tile service can still be useful.
+    // We do not silently claim that it covers newer maps.
+    fallback.style.display="block";
+    img.style.display="none";
   };
 }
 
-
-/* ============================================================
- * LIVE EVENTS
- * ============================================================ */
-
-async function loadLiveEvents() {
-
-  /*
-   * Clear previous API warning.
-   */
-  apiWarning.innerHTML = "";
-
-  setStatus(
-    "Получаю состояние событий…",
-    "info"
-  );
-
-  try {
-
-    /*
-     * v1/events remains the live-event feed.
-     *
-     * It is intentionally isolated from the v2 static
-     * architecture so that a failure here cannot break
-     * zone selection.
-     */
-    const data = await fetchJson(
-      API_V1 +
-      "/events.json?world_id=" +
-      encodeURIComponent(worldId),
-      {
-        retries: 3,
-        timeout: 12000
-      }
-    );
-
-    worldEvents =
-      Array.isArray(data.events)
-        ? data.events
-        : [];
-
-    setStatus(
-      "Live API обновлён: " +
-      new Date().toLocaleTimeString(),
-      "ok"
-    );
-
-    renderCurrentEvents();
-
-  } catch (error) {
-
-    console.error(
-      "Live events API failed:",
-      error
-    );
-
-    worldEvents = [];
-
-    renderCurrentEvents();
-
-    let message =
-      "Live API событий временно недоступен.";
-
-    if (error.status === 503) {
-
-      message +=
-        " Сервер GW2 API вернул HTTP 503 " +
-        "(endpoint отключён или временно недоступен).";
-
-    } else if (error.status === 429) {
-
-      message +=
-        " API ограничил частоту запросов.";
-
-    } else {
-
-      message +=
-        ` Ошибка: ${error.message}`;
-
-    }
-
-    apiWarning.innerHTML =
-      `<div class="warning">
-        ${escapeHtml(message)}
-        <br><br>
-        Список зон и карта продолжают работать независимо
-        от live-feed.
-      </div>`;
-
-    setStatus(
-      "Live API недоступен",
-      "error"
-    );
-  }
-}
-
-
-/*
- * Optional static event details.
- *
- * event_details is still v1 and its data is incomplete for
- * newer expansions. Therefore it is NOT required for zone
- * selection.
- */
-async function loadEventDetails() {
-
-  try {
-
-    const data =
-      await fetchJson(
-        API_V1 + "/event_details.json",
-        {
-          retries: 1,
-          timeout: 15000
-        }
-      );
-
-    eventDetails =
-      data.events || {};
-
-  } catch (error) {
-
-    console.warn(
-      "event_details unavailable:",
-      error
-    );
-
-    eventDetails = null;
-  }
-}
-
-
-/* ============================================================
- * EVENT RENDERING
- * ============================================================ */
-
-function getActiveEventsForMap() {
-
-  if (!Array.isArray(worldEvents)) {
-    return [];
-  }
-
-  return worldEvents.filter(event => {
-
-    return (
-      Number(event.map_id) === Number(mapId) &&
-      String(event.state).toLowerCase() ===
-        "active"
-    );
-  });
-}
-
-
-function clearMarkers() {
-
-  markerLayer.innerHTML = "";
-
-  currentMarkers = [];
-}
-
-
-function renderCurrentEvents() {
-
+function selectZone(id){
+  const m=state.maps.find(x=>x.id===Number(id));
+  if(!m) return;
+  state.selected=m;
+  renderInfo(m);
+  renderEvents(m);
+  renderLinks(m);
   clearMarkers();
-
-  const zone = getSelectedZone();
-
-  if (!zone) {
-
-    evtList.innerHTML =
-      `<div class="empty">
-        Выберите зону.
-      </div>`;
-
-    return;
-  }
-
-  const active =
-    getActiveEventsForMap();
-
-  listTitle.textContent =
-    "Активные ивенты — " +
-    zone.name;
-
-  listSubtitle.textContent =
-    `Map ID: ${zone.id} · активных: ${active.length}`;
-
-  if (!active.length) {
-
-    evtList.innerHTML =
-      `<div class="empty">
-        Сейчас активные события для этой зоны
-        не получены.
-      </div>`;
-
-    return;
-  }
-
-  evtList.innerHTML = "";
-
-  active.forEach((event, index) => {
-
-    const details =
-      eventDetails
-        ? eventDetails[event.event_id]
-        : null;
-
-    /*
-     * event_details is not guaranteed to contain every
-     * modern event. We therefore use the event_id as a
-     * fallback.
-     */
-    const name =
-      details?.name ||
-      `Event ${event.event_id}`;
-
-    const level =
-      details?.level ??
-      "—";
-
-    let position = null;
-
-    if (
-      details &&
-      details.location &&
-      Array.isArray(
-        details.location.center
-      )
-    ) {
-
-      position =
-        eventToNormalized(
-          zone.map_rect,
-          details.location.center
-        );
-    }
-
-    /*
-     * Marker.
-     */
-    if (position) {
-
-      const marker =
-        document.createElement("button");
-
-      marker.type = "button";
-      marker.className = "marker";
-
-      marker.style.left =
-        `${position.x * 100}%`;
-
-      marker.style.top =
-        `${position.y * 100}%`;
-
-      marker.dataset.index =
-        String(index);
-
-      marker.title = name;
-
-      marker.onclick = () =>
-        highlightEvent(index);
-
-      markerLayer.appendChild(marker);
-
-      /*
-       * Optional label.
-       */
-      const label =
-        document.createElement("div");
-
-      label.className =
-        "marker-label";
-
-      label.style.left =
-        `${position.x * 100}%`;
-
-      label.style.top =
-        `${position.y * 100}%`;
-
-      label.textContent =
-        name.slice(0, 35);
-
-      markerLayer.appendChild(label);
-
-      currentMarkers.push(marker);
-    }
-
-    /*
-     * List row.
-     */
-    const row =
-      document.createElement("div");
-
-    row.className =
-      "evt-row";
-
-    row.dataset.index =
-      String(index);
-
-    row.innerHTML =
-      `<div>
-        ${escapeHtml(name)}
-      </div>
-      <div class="lvl">
-        ур. ${escapeHtml(level)}
-        · Event ID:
-        ${escapeHtml(event.event_id)}
-      </div>`;
-
-    row.onclick = () =>
-      highlightEvent(index);
-
-    evtList.appendChild(row);
-  });
+  loadMapImage(m);
 }
 
-
-/* ============================================================
- * HIGHLIGHT
- * ============================================================ */
-
-function highlightEvent(index) {
-
-  document
-    .querySelectorAll(".marker")
-    .forEach(marker => {
-
-      marker.classList.toggle(
-        "hl",
-        marker.dataset.index ===
-          String(index)
-      );
-    });
-
-  document
-    .querySelectorAll(".evt-row")
-    .forEach(row => {
-
-      row.classList.toggle(
-        "hl",
-        row.dataset.index ===
-          String(index)
-      );
-    });
-}
-
-
-/* ============================================================
- * AUTO REFRESH
- * ============================================================ */
-
-function startAuto() {
-
-  stopAuto();
-
-  if (!autoRefresh) {
-    return;
-  }
-
-  refreshTimer =
-    setInterval(
-      loadLiveEvents,
-      30000
-    );
-}
-
-
-function stopAuto() {
-
-  if (refreshTimer) {
-
-    clearInterval(refreshTimer);
-
-    refreshTimer = null;
+async function load(){
+  $("info").innerHTML="Загрузка карт…";
+  try{
+    // IMPORTANT: /v2/worlds without ids returns only IDs. We no longer use worlds at all,
+    // because PvE uses megaserver and a server selector is misleading.
+    const maps = await getJSON(`${API}/maps?ids=all&lang=en`);
+    if(!Array.isArray(maps)) throw new Error("Unexpected /v2/maps response");
+    state.maps = maps.filter(mapIsZoneLike);
+    renderZoneList();
+  }catch(err){
+    console.error(err);
+    $("info").innerHTML=`<span class="bad">Не удалось загрузить карты.</span><div class="small muted">${esc(err.message)}</div>`;
+    $("zone").innerHTML='<option>Ошибка API</option>';
   }
 }
 
+$("continent").addEventListener("change",renderZoneList);
+$("zone").addEventListener("change",e=>selectZone(e.target.value));
+$("search").addEventListener("input",renderZoneList);
+$("reload").addEventListener("click",load);
 
-/* ============================================================
- * EVENT HANDLERS
- * ============================================================ */
-
-continentSel.addEventListener(
-  "change",
-  () => {
-
-    continentId =
-      Number(continentSel.value);
-
-    mapId = null;
-
-    populateZones();
-  }
-);
-
-
-zoneSel.addEventListener(
-  "change",
-  () => {
-
-    mapId =
-      Number(zoneSel.value);
-
-    renderSelectedZone();
-  }
-);
-
-
-worldSel.addEventListener(
-  "change",
-  async () => {
-
-    worldId =
-      Number(worldSel.value);
-
-    await loadLiveEvents();
-  }
-);
-
-
-flipBtn.addEventListener(
-  "click",
-  () => {
-
-    flipY =
-      !flipY;
-
-    flipBtn.classList.toggle(
-      "toggled",
-      flipY
-    );
-
-    renderCurrentEvents();
-  }
-);
-
-
-autoBtn.addEventListener(
-  "click",
-  () => {
-
-    autoRefresh =
-      !autoRefresh;
-
-    autoBtn.textContent =
-      "Автообновление: " +
-      (autoRefresh
-        ? "вкл"
-        : "выкл");
-
-    autoBtn.classList.toggle(
-      "toggled",
-      autoRefresh
-    );
-
-    if (autoRefresh) {
-      startAuto();
-    } else {
-      stopAuto();
-    }
-  }
-);
-
-
-reloadBtn.addEventListener(
-  "click",
-  async () => {
-
-    reloadBtn.disabled = true;
-
-    try {
-
-      await loadLiveEvents();
-
-    } finally {
-
-      reloadBtn.disabled = false;
-    }
-  }
-);
-
-
-/* ============================================================
- * INIT
- * ============================================================ */
-
-async function init() {
-
-  mapCanvas.classList.add("loading");
-
-  try {
-
-    /*
-     * Static data is completely independent from live event
-     * data.
-     */
-    await loadStaticData();
-
-    populateWorlds();
-    populateZones();
-
-    /*
-     * event_details is optional. Failure here does not
-     * prevent the application from starting.
-     */
-    loadEventDetails();
-
-    /*
-     * Live events are loaded independently.
-     */
-    await loadLiveEvents();
-
-    startAuto();
-
-  } catch (error) {
-
-    console.error(
-      "Application initialization failed:",
-      error
-    );
-
-    setStatus(
-      "Ошибка загрузки API: " +
-      error.message,
-      "error"
-    );
-
-    evtList.innerHTML =
-      `<div class="empty">
-        Не удалось загрузить справочники GW2 API.
-        <br><br>
-        ${escapeHtml(error.message)}
-      </div>`;
-
-  } finally {
-
-    mapCanvas.classList.remove("loading");
-  }
-}
-
-
-init();
+load();
 </script>
-
 </body>
 </html>
