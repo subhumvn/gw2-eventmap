@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GW2 — Карта текущих ивентов</title>
+<style>
+  :root{
+    --bg:#14110d; --panel:#1e1a14; --panel2:#26201a; --gold:#c9a227; --gold-soft:#8a7326;
+    --text:#e9e2d0; --muted:#a89b7d; --accent:#d34b3d; --active:#4caf6a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif}
+  header{padding:14px 20px;background:linear-gradient(180deg,#221c14,#16130e);border-bottom:2px solid var(--gold-soft)}
+  header h1{margin:0;font-size:20px;letter-spacing:.5px;color:var(--gold)}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;padding:12px 20px;background:var(--panel);align-items:center;border-bottom:1px solid #332c20}
+  select,button{background:var(--panel2);color:var(--text);border:1px solid var(--gold-soft);border-radius:6px;padding:7px 10px;font-size:13px}
+  button{cursor:pointer;color:var(--gold)}
+  button:hover{background:#332b1e}
+  button.toggled{background:var(--gold-soft);color:#1a1508}
+  .status{font-size:12px;color:var(--muted);margin-left:auto}
+  main{display:flex;gap:14px;padding:14px 20px;flex-wrap:wrap}
+  .mapwrap{flex:2;min-width:340px;background:var(--panel);border:1px solid #332c20;border-radius:8px;padding:10px;position:relative}
+  svg{width:100%;height:auto;background:#1a2a1a;border-radius:6px;display:block}
+  .list{flex:1;min-width:260px;background:var(--panel);border:1px solid #332c20;border-radius:8px;padding:10px;max-height:560px;overflow:auto}
+  .list h3{margin:2px 0 10px;color:var(--gold);font-size:14px}
+  .evt-row{padding:8px;border-radius:6px;margin-bottom:6px;background:var(--panel2);cursor:pointer;border:1px solid transparent;font-size:13px}
+  .evt-row:hover,.evt-row.hl{border-color:var(--gold)}
+  .evt-row .lvl{color:var(--muted);font-size:11px}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:30px 10px}
+  .dot{fill:var(--active);stroke:#0c1c0c;stroke-width:1.5;cursor:pointer}
+  .dot.hl{fill:var(--accent);r:9}
+  .lbl{font-size:9px;fill:#dff0df;pointer-events:none;paint-order:stroke;stroke:#0c1c0c;stroke-width:2px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  a.credit{color:var(--gold-soft)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Guild Wars 2 — Карта текущих ивентов</h1>
+  <p>Данные напрямую из официального GW2 API (api.guildwars2.com, v1). Выберите сервер и карту.</p>
+</header>
+
+<div class="controls">
+  <label>Сервер: <select id="worldSel"><option>Загрузка миров…</option></select></label>
+  <label>Карта: <select id="mapSel"><option>—</option></select></label>
+  <button id="flipBtn" title="Если точки выглядят зеркально — нажмите">Перевернуть по Y</button>
+  <button id="autoBtn" class="toggled">Автообновление: вкл</button>
+  <span class="status" id="status">…</span>
+</div>
+
+<main>
+  <div class="mapwrap">
+    <svg id="svg" viewBox="0 0 800 500"></svg>
+    <div class="hint">Координаты события берутся из <code>event_details</code> и пересчитываются в границы карты (<code>map_rect</code>). Клик по точке или по строке справа подсвечивает ивент.</div>
+  </div>
+  <div class="list">
+    <h3 id="listTitle">Активные ивенты</h3>
+    <div id="evtList" class="empty">Выберите сервер и карту…</div>
+  </div>
+</main>
+
+<script>
+const API = 'https://api.guildwars2.com/v1';
+let worldId = null, mapId = null;
+let eventDetails = null;      // id -> {name, level, map_id, location}
+let worldNames = {}, mapNames = {};
+let currentActive = [];       // active events on selected map
+let flip = false;
+let autoRefresh = true;
+let refreshTimer = null;
+
+const worldSel = document.getElementById('worldSel');
+const mapSel = document.getElementById('mapSel');
+const statusEl = document.getElementById('status');
+const svg = document.getElementById('svg');
+const evtList = document.getElementById('evtList');
+const listTitle = document.getElementById('listTitle');
+
+function setStatus(t){ statusEl.textContent = t; }
+
+async function jget(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
+  return r.json();
+}
+
+async function init(){
+  setStatus('Загружаю справочники…');
+  try{
+    const [worlds, maps, details] = await Promise.all([
+      jget(API+'/world_names.json'),
+      jget(API+'/map_names.json'),
+      jget(API+'/event_details.json')
+    ]);
+    worlds.forEach(w=>worldNames[w.id]=w.name);
+    maps.forEach(m=>mapNames[m.id]=m.name);
+    eventDetails = details.events;
+
+    worldSel.innerHTML = '';
+    const sorted = worlds.slice().sort((a,b)=>a.name.localeCompare(b.name));
+    sorted.forEach(w=>{
+      const opt = document.createElement('option');
+      opt.value = w.id; opt.textContent = w.name + (w.id>=2001?' (EU)':' (NA)');
+      worldSel.appendChild(opt);
+    });
+    // default: first EU world if present
+    const eu = sorted.find(w=>w.id>=2001);
+    worldId = eu ? eu.id : sorted[0].id;
+    worldSel.value = worldId;
+
+    setStatus('Готово. Загружаю ивенты сервера…');
+    await loadWorldEvents();
+    startAuto();
+  }catch(e){
+    setStatus('Ошибка загрузки: '+e.message);
+  }
+}
+
+let worldEventsRaw = []; // {world_id,map_id,event_id,state}
+
+async function loadWorldEvents(){
+  setStatus('Обновляю список ивентов…');
+  try{
+    const data = await jget(API+'/events.json?world_id='+worldId);
+    worldEventsRaw = data.events;
+    populateMapSelect();
+    if(mapId){
+      renderMapEvents();
+    }
+    setStatus('Обновлено: '+new Date().toLocaleTimeString());
+  }catch(e){
+    setStatus('Ошибка: '+e.message);
+  }
+}
+
+function populateMapSelect(){
+  const counts = {};
+  worldEventsRaw.forEach(e=>{
+    if(e.state==='Active'){
+      counts[e.map_id] = (counts[e.map_id]||0)+1;
+    }
+  });
+  const ids = Object.keys(counts).map(Number).sort((a,b)=>counts[b]-counts[a]);
+  const prevMap = mapId;
+  mapSel.innerHTML = '';
+  if(ids.length===0){
+    mapSel.innerHTML = '<option>Нет активных ивентов</option>';
+    mapId = null;
+    evtList.innerHTML = '<div class="empty">На этом сервере сейчас нет активных ивентов (странно, но бывает).</div>';
+    return;
+  }
+  ids.forEach(id=>{
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = (mapNames[id]||('Карта #'+id)) + ' — активных: '+counts[id];
+    mapSel.appendChild(opt);
+  });
+  if(prevMap && counts[prevMap]){
+    mapId = prevMap;
+  } else {
+    mapId = ids[0];
+  }
+  mapSel.value = mapId;
+}
+
+let mapRectCache = {};
+async function getMapRect(id){
+  if(mapRectCache[id]) return mapRectCache[id];
+  const data = await jget(API+'/maps.json?map_id='+id);
+  const info = data.maps[id];
+  mapRectCache[id] = info.map_rect;
+  return info.map_rect;
+}
+
+async function renderMapEvents(){
+  if(!mapId) return;
+  setStatus('Рисую карту…');
+  currentActive = worldEventsRaw.filter(e=>e.map_id==mapId && e.state==='Active');
+  listTitle.textContent = 'Активные ивенты — ' + (mapNames[mapId]||('Карта #'+mapId));
+
+  let rect;
+  try{
+    rect = await getMapRect(mapId);
+  }catch(e){
+    setStatus('Не удалось получить границы карты: '+e.message);
+    return;
+  }
+
+  const xs = [rect[0][0], rect[1][0]], ys = [rect[0][1], rect[1][1]];
+  const xmin=Math.min(...xs), xmax=Math.max(...xs), ymin=Math.min(...ys), ymax=Math.max(...ys);
+
+  const W=800,H=500;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.innerHTML = '<rect x="2" y="2" width="'+(W-4)+'" height="'+(H-4)+'" fill="none" stroke="#3a5a3a" stroke-width="2" rx="6"/>';
+
+  evtList.innerHTML = '';
+  if(currentActive.length===0){
+    evtList.innerHTML = '<div class="empty">На этой карте сейчас нет активных ивентов.</div>';
+    return;
+  }
+
+  currentActive.forEach((e,idx)=>{
+    const det = eventDetails[e.event_id];
+    if(!det || !det.location || !det.location.center){
+      return; // нет координат
+    }
+    const [ex,ey] = det.location.center;
+    let nx = (ex-xmin)/(xmax-xmin || 1);
+    let ny = (ey-ymin)/(ymax-ymin || 1);
+    if(flip) ny = 1-ny;
+    nx = Math.min(1,Math.max(0,nx));
+    ny = Math.min(1,Math.max(0,ny));
+    const px = 10 + nx*(W-20);
+    const py = 10 + ny*(H-20);
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.dataset.idx = idx;
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',px); c.setAttribute('cy',py); c.setAttribute('r',6);
+    c.setAttribute('class','dot');
+    c.dataset.idx = idx;
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x', px+8); label.setAttribute('y', py+3);
+    label.setAttribute('class','lbl');
+    label.textContent = (det.name || '—').slice(0,28);
+    g.appendChild(c); g.appendChild(label);
+    svg.appendChild(g);
+
+    const row = document.createElement('div');
+    row.className='evt-row';
+    row.dataset.idx = idx;
+    row.innerHTML = '<div>'+(det.name||'(без названия)')+'</div><div class="lvl">ур. '+det.level+' · карта: '+(mapNames[det.map_id]||det.map_id)+'</div>';
+    row.onclick = ()=>highlight(idx);
+    evtList.appendChild(row);
+
+    c.onclick = ()=>highlight(idx);
+  });
+
+  setStatus('Обновлено: '+new Date().toLocaleTimeString()+' · точек: '+svg.querySelectorAll('.dot').length);
+}
+
+function highlight(idx){
+  document.querySelectorAll('.dot').forEach(d=>d.classList.toggle('hl', d.dataset.idx==idx));
+  document.querySelectorAll('.evt-row').forEach(r=>r.classList.toggle('hl', r.dataset.idx==idx));
+}
+
+worldSel.onchange = ()=>{ worldId = Number(worldSel.value); mapId=null; loadWorldEvents(); };
+mapSel.onchange = ()=>{ mapId = Number(mapSel.value); renderMapEvents(); };
+document.getElementById('flipBtn').onclick = (e)=>{ flip=!flip; e.target.classList.toggle('toggled',flip); renderMapEvents(); };
+document.getElementById('autoBtn').onclick = (e)=>{
+  autoRefresh = !autoRefresh;
+  e.target.textContent = 'Автообновление: '+(autoRefresh?'вкл':'выкл');
+  e.target.classList.toggle('toggled', autoRefresh);
+  if(autoRefresh) startAuto(); else stopAuto();
+};
+
+function startAuto(){
+  stopAuto();
+  refreshTimer = setInterval(loadWorldEvents, 30000);
+}
+function stopAuto(){ if(refreshTimer) clearInterval(refreshTimer); }
+
+init();
+</script>
+</body>
+</html>
