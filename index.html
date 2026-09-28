@@ -3,143 +3,178 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GW2 Event Map — modern</title>
+<title>GW2 Event Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
 :root{color-scheme:dark;--bg:#0b1117;--panel:#121a22;--panel2:#18232d;--line:#2b3a47;--text:#e8eef3;--muted:#91a0ad;--accent:#55b6ff;--ok:#61d095;--warn:#f0bd5a;--bad:#ff7474}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-header{padding:14px 18px;border-bottom:1px solid var(--line);background:#0d151d;position:sticky;top:0;z-index:10}
-h1{margin:0;font-size:18px} .sub{color:var(--muted);font-size:12px;margin-top:3px}
-.toolbar{display:grid;grid-template-columns:180px 1fr 1fr auto;gap:10px;padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
-label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
-select,input,button{width:100%;background:#0d151d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px}
+header{padding:14px 18px;border-bottom:1px solid var(--line);background:#0d151d}
+h1{margin:0;font-size:18px}.sub{color:var(--muted);font-size:12px;margin-top:3px}
+.toolbar{display:grid;grid-template-columns:180px 1fr 1fr auto;gap:10px;padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--line);align-items:end}
+label.l{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+select,input[type=text],button{width:100%;background:#0d151d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px}
 button{cursor:pointer}button:hover{border-color:#4b6578}
-main{display:grid;grid-template-columns:minmax(0,1fr) 340px;min-height:calc(100vh - 111px)}
-.mapWrap{position:relative;overflow:hidden;background:#0b1510;min-height:620px}
-#mapViewport{position:absolute;inset:0;overflow:auto;padding:18px}
-#mapStage{position:relative;margin:auto;width:min(100%,1100px);min-width:600px;background:#15251a;box-shadow:0 8px 35px #0008}
-#mapImage{display:block;width:100%;height:auto;min-height:360px;object-fit:contain;background:#17301d}
-#mapFallback{display:none;padding:80px 30px;text-align:center;color:var(--muted);min-height:420px}
-.marker{position:absolute;transform:translate(-50%,-100%);width:18px;height:18px;border-radius:50%;background:#ff5c5c;border:2px solid #fff;box-shadow:0 2px 9px #000;cursor:pointer}
-.marker.active{background:var(--ok);width:21px;height:21px}
-.marker span{position:absolute;left:24px;top:-4px;white-space:nowrap;background:#0b111ddd;padding:3px 6px;border-radius:4px;font-size:11px;pointer-events:none}
+main{display:grid;grid-template-columns:minmax(0,1fr) 320px;height:calc(100vh - 128px);min-height:560px}
+.mapWrap{position:relative;background:#0b1510}
+#map{position:absolute;inset:0;background:#0b1510}
 .sidebar{border-left:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
 .card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px;margin-bottom:10px}
-.card h2{font-size:14px;margin:0 0 8px}.muted{color:var(--muted)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-.event{padding:9px 0;border-top:1px solid var(--line)}.event:first-child{border-top:0}
-.eventName{font-weight:600}.pill{display:inline-block;padding:2px 6px;border-radius:99px;background:#263544;color:#b9c7d2;font-size:10px;margin-left:5px}
-.small{font-size:12px}.links a{color:var(--accent);text-decoration:none}.links a:hover{text-decoration:underline}
-@media(max-width:900px){main{grid-template-columns:1fr}.sidebar{border-left:0;border-top:1px solid var(--line)}.toolbar{grid-template-columns:1fr 1fr}.mapWrap{min-height:500px}}
+.card h2{font-size:14px;margin:0 0 8px}.muted{color:var(--muted)}.bad{color:var(--bad)}.small{font-size:12px}
+.links a{color:var(--accent);text-decoration:none;display:block;margin-bottom:4px}.links a:hover{text-decoration:underline}
+.chk{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer}
+.chk input{width:auto;margin:0}.chk .n{margin-left:auto;color:var(--muted);font-size:12px}
+/* markers */
+.pin{position:relative;width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 8px #000;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;color:#fff;overflow:hidden}
+.pin img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#0d151d}
+.pin b{font-weight:400}
+.wp{background:#3a8dde}.poi{background:#8a63d2}.vista{background:#27a9a0}.heart{background:#e0454f}.skill{background:#d98a1f}.unlock{background:#6b7b88}
+.dot{display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.sector-label span{display:inline-block;transform:translate(-50%,-50%);color:#fff;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000,0 0 5px #000;pointer-events:none}
+.leaflet-popup-content{font:13px/1.4 system-ui,sans-serif;color:#111}
+.leaflet-popup-content code{font-size:11px;word-break:break-all;background:#eee;padding:1px 4px;border-radius:3px}
+.leaflet-popup-content button{width:auto;margin-top:6px;padding:4px 8px;color:#111;background:#f2f2f2;border:1px solid #bbb;font-size:12px}
+@media(max-width:900px){main{grid-template-columns:1fr;height:auto}.mapWrap{height:70vh}.sidebar{border-left:0;border-top:1px solid var(--line)}.toolbar{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <header>
   <h1>GW2 Event Map</h1>
-  <div class="sub">Zone data: Guild Wars 2 API v2 · map artwork: GW2 Wiki · dynamic event state: not provided by the current official API</div>
+  <div class="sub">Данные: Guild Wars 2 API v2 · тайлы карты: tiles.guildwars2.com · точки: waypoints, POI, vistas, renown hearts, hero challenges</div>
 </header>
 
 <section class="toolbar">
   <div>
-    <label>Континент</label>
+    <label class="l">Континент</label>
     <select id="continent"><option value="1">Tyria</option><option value="2">The Mists</option></select>
   </div>
   <div>
-    <label>Zone / Map</label>
+    <label class="l">Zone / Map</label>
     <select id="zone"><option>Загрузка…</option></select>
   </div>
   <div>
-    <label>Поиск зоны</label>
-    <input id="search" placeholder="Например: Dragonfall">
+    <label class="l">Поиск зоны</label>
+    <input id="search" type="text" placeholder="Например: Dragonfall">
   </div>
   <button id="reload">Обновить</button>
 </section>
 
 <main>
-  <section class="mapWrap">
-    <div id="mapViewport">
-      <div id="mapStage">
-        <img id="mapImage" alt="Map">
-        <div id="mapFallback">Карта изображения не найдена.<br>Можно открыть страницу зоны на GW2 Wiki.</div>
-        <div id="markers"></div>
-      </div>
-    </div>
-  </section>
-
+  <section class="mapWrap"><div id="map"></div></section>
   <aside class="sidebar">
     <div class="card" id="info">Загрузка данных…</div>
-    <div class="card">
-      <h2>События</h2>
-      <div class="small muted">
-        Старый <code>/v1/events</code> намеренно не используется: он привязан к устаревшей модели world/server и помечен GW2 Wiki как obsolete после введения megaserver.
-      </div>
-      <div id="events" style="margin-top:8px"></div>
-    </div>
-    <div class="card links" id="wikiLinks"></div>
+    <div class="card"><h2>Слои</h2><div id="layers" class="small muted">Выберите зону.</div></div>
+    <div class="card links small" id="wikiLinks"></div>
   </aside>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 const API = "https://api.guildwars2.com/v2";
+const TILES = "https://tiles.guildwars2.com";
 const WIKI = "https://wiki.guildwars2.com/wiki/";
-const WIKI_FILE = "https://wiki.guildwars2.com/wiki/Special:Redirect/file/";
-const state = { maps: [], selected: null };
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+const ZONE_TYPES = ["Public","Center","BlueHome","GreenHome","RedHome","EdgeOfTheMists","JumpPuzzle"];
+
+const LAYER_DEFS = {
+  waypoint:{label:"Waypoints",cls:"wp",sym:"◆",on:true},
+  landmark:{label:"Points of Interest",cls:"poi",sym:"★",on:true},
+  vista:{label:"Vistas",cls:"vista",sym:"▲",on:true},
+  heart:{label:"Renown Hearts",cls:"heart",sym:"♥",on:true},
+  skill:{label:"Hero Challenges",cls:"skill",sym:"✦",on:true},
+  unlock:{label:"Unlocks / прочее",cls:"unlock",sym:"●",on:true},
+  sector:{label:"Названия секторов",cls:"unlock",sym:"A",on:false}
+};
+
+const state = {maps:[], selected:null, continents:{}, cache:{}, map:null, tile:null, outline:null, groups:{}, mz:7, req:0, vis:{}};
+for(const k in LAYER_DEFS) state.vis[k] = LAYER_DEFS[k].on;
 
 const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const list = v => Array.isArray(v) ? v : Object.values(v || {});
 
 async function getJSON(url){
-  const r = await fetch(url, {cache:"no-store"});
-  if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
-}
-
-function esc(s){
-  return String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-
-function wikiFile(name){
-  // GW2 Wiki uses normal zone-map filenames such as "Dragonfall map.jpg".
-  return WIKI_FILE + encodeURIComponent(name + " map.jpg");
-}
-
-function wikiPage(name){
-  return WIKI + encodeURIComponent(name.replaceAll(" ","_"));
+  if(state.cache[url]) return state.cache[url];
+  const r = await fetch(url);
+  if(!r.ok) throw new Error(`${r.status} ${r.statusText} — ${url}`);
+  const j = await r.json();
+  state.cache[url] = j;
+  return j;
 }
 
 function mapIsZoneLike(m){
-  // Public maps are the useful open-world set. Instances, guild halls etc. are excluded.
-  return m && m.type === "Public" && Number.isFinite(m.id) && m.name;
+  return m && ZONE_TYPES.includes(m.type) && Number.isFinite(m.id) && m.name && m.continent_id;
+}
+
+function initMap(){
+  state.map = L.map("map",{crs:L.CRS.Simple,zoomSnap:0.5,attributionControl:false,minZoom:0,maxZoom:8});
+  state.map.setView([0,0],0);
+}
+
+const ll = c => state.map.unproject(c, state.mz);
+
+function pinIcon(def, iconUrl){
+  const img = iconUrl ? `<img src="${esc(iconUrl)}" alt="" onerror="this.remove()">` : "";
+  return L.divIcon({className:"",html:`<div class="pin ${def.cls}"><b>${def.sym}</b>${img}</div>`,iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-12]});
+}
+
+function popupHtml(title, lines, code){
+  let h = `<b>${esc(title)}</b>`;
+  for(const l of lines) h += `<br>${esc(l)}`;
+  if(code) h += `<br><code>${esc(code)}</code><br><button onclick="navigator.clipboard&&navigator.clipboard.writeText(this.dataset.c)" data-c="${esc(code)}">Копировать код</button>`;
+  return h;
 }
 
 function renderZoneList(){
   const q = $("search").value.trim().toLowerCase();
   const continent = Number($("continent").value);
-  const list = state.maps
-    .filter(m => m.continent_id === continent && mapIsZoneLike(m))
+  const items = state.maps
+    .filter(m => m.continent_id === continent)
     .filter(m => !q || m.name.toLowerCase().includes(q))
     .sort((a,b)=>a.name.localeCompare(b.name,"en"));
 
   const sel = $("zone");
-  const old = Number(sel.value);
+  const old = state.selected ? state.selected.id : null;
   sel.innerHTML = "";
-  for(const m of list){
-    const o=document.createElement("option");
-    o.value=m.id;
-    o.textContent=`${m.name} (${m.min_level ?? "?"}–${m.max_level ?? "?"})`;
+  for(const m of items){
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = `${m.name} (${m.min_level ?? "?"}–${m.max_level ?? "?"})`;
     sel.appendChild(o);
   }
-  if(list.some(m=>m.id===old)) sel.value=String(old);
-  if(!list.length){
-    sel.innerHTML='<option>Нет подходящих карт</option>';
-    state.selected=null;
+  if(!items.length){
+    sel.innerHTML = '<option>Нет подходящих карт</option>';
     return;
   }
-  const chosen=list.find(m=>m.id===Number(sel.value)) || list[0];
-  sel.value=String(chosen.id);
-  selectZone(chosen.id);
+  const chosen = items.find(m=>m.id===old) || items[0];
+  sel.value = String(chosen.id);
+  if(chosen.id !== old) selectZone(chosen.id);
 }
 
-function clearMarkers(){ $("markers").innerHTML=""; }
+function renderLayerControls(counts){
+  $("layers").innerHTML = Object.entries(LAYER_DEFS).map(([k,d])=>
+    `<label class="chk"><input type="checkbox" data-k="${k}" ${state.vis[k]?"checked":""}><span class="dot ${d.cls}">${d.sym}</span>${d.label}<span class="n">${counts[k]||0}</span></label>`
+  ).join("");
+}
 
-function renderInfo(m){
+function applyVisibility(){
+  for(const k in state.groups){
+    const g = state.groups[k];
+    if(state.vis[k]) g.addTo(state.map); else g.remove();
+  }
+}
+
+function clearLayers(){
+  for(const k in state.groups) state.groups[k].remove();
+  state.groups = {};
+  if(state.outline){ state.outline.remove(); state.outline = null; }
+}
+
+async function getContinent(id){
+  if(!state.continents[id]) state.continents[id] = await getJSON(`${API}/continents/${id}`);
+  return state.continents[id];
+}
+
+function renderInfo(m, extra){
   $("info").innerHTML = `
     <h2>${esc(m.name)}</h2>
     <div class="small">Map ID: <b>${m.id}</b></div>
@@ -147,77 +182,140 @@ function renderInfo(m){
     <div class="small">Continent: <b>${esc(m.continent_name || "—")}</b></div>
     <div class="small">Level: <b>${m.min_level ?? "—"}–${m.max_level ?? "—"}</b></div>
     <div class="small">Type: <b>${esc(m.type || "—")}</b></div>
-    <div class="small muted" style="margin-top:7px">Map rectangle: ${esc(JSON.stringify(m.map_rect || "—"))}</div>
-  `;
-}
-
-function renderEvents(m){
-  // Static, deliberately non-live examples. Add more entries here as desired.
-  const staticEvents = {
-    1317: [
-      {name:"The Battle of Dragonfall", kind:"meta event", note:"Составной meta-event Dragonfall; текущее состояние из официального API не доступно."}
-    ]
-  };
-  const arr = staticEvents[m.id] || [];
-  $("events").innerHTML = arr.length
-    ? arr.map(e=>`<div class="event"><div class="eventName">${esc(e.name)} <span class="pill">${esc(e.kind)}</span></div><div class="small muted">${esc(e.note)}</div></div>`).join("")
-    : `<div class="small muted">Для этой зоны в локальном справочнике нет статических событий.</div>`;
+    ${extra ? `<div class="small" style="margin-top:7px">${extra}</div>` : ""}`;
 }
 
 function renderLinks(m){
   $("wikiLinks").innerHTML = `
-    <h2>Источники</h2>
-    <div><a target="_blank" rel="noopener" href="${wikiPage(m.name)}">Открыть ${esc(m.name)} на GW2 Wiki</a></div>
-    <div><a target="_blank" rel="noopener" href="${API}/maps/${m.id}">API v2 /maps/${m.id}</a></div>
-  `;
+    <a target="_blank" rel="noopener" href="${WIKI}${encodeURIComponent(m.name.replaceAll(" ","_"))}">Открыть ${esc(m.name)} на GW2 Wiki</a>
+    <a target="_blank" rel="noopener" href="${API}/maps/${m.id}">API v2 /maps/${m.id}</a>`;
 }
 
-function loadMapImage(m){
-  const img=$("mapImage"), fallback=$("mapFallback");
-  fallback.style.display="none";
-  img.style.display="block";
-  img.src=wikiFile(m.name);
-  img.onload=()=>{ img.style.display="block"; fallback.style.display="none"; };
-  img.onerror=()=>{
-    // For older maps the official tile service can still be useful.
-    // We do not silently claim that it covers newer maps.
-    fallback.style.display="block";
-    img.style.display="none";
-  };
-}
-
-function selectZone(id){
-  const m=state.maps.find(x=>x.id===Number(id));
+async function selectZone(id){
+  const m = state.maps.find(x=>x.id===Number(id));
   if(!m) return;
-  state.selected=m;
-  renderInfo(m);
-  renderEvents(m);
+  state.selected = m;
+  const req = ++state.req;
+  renderInfo(m, "Загрузка точек…");
   renderLinks(m);
-  clearMarkers();
-  loadMapImage(m);
+  clearLayers();
+
+  try{
+    const cont = await getContinent(m.continent_id);
+    if(req !== state.req) return;
+    const floor = m.default_floor ?? 1;
+    state.mz = cont.max_zoom;
+    state.map.invalidateSize();
+    state.map.setMinZoom(cont.min_zoom);
+    state.map.setMaxZoom(cont.max_zoom + 1);
+
+    if(state.tile) state.map.removeLayer(state.tile);
+    const dims = cont.continent_dims;
+    const bounds = L.latLngBounds(ll([0,dims[1]]), ll([dims[0],0]));
+    state.tile = L.tileLayer(`${TILES}/${cont.id}/${floor}/{z}/{x}/{y}.jpg`,{
+      minZoom:cont.min_zoom, maxZoom:cont.max_zoom+1, maxNativeZoom:cont.max_zoom,
+      bounds, noWrap:true, errorTileUrl:BLANK
+    }).addTo(state.map);
+
+    const cr = m.continent_rect;
+    const rb = L.latLngBounds(ll(cr[0]), ll(cr[1]));
+    state.map.fitBounds(rb,{padding:[20,20]});
+    state.outline = L.rectangle(rb,{color:"#55b6ff",weight:1,fill:false,dashArray:"5 5",interactive:false}).addTo(state.map);
+
+    if(m.region_id == null) throw new Error("у карты нет region_id — данные о точках недоступны");
+    const d = await getJSON(`${API}/continents/${m.continent_id}/floors/${floor}/regions/${m.region_id}/maps/${m.id}`);
+    if(req !== state.req) return;
+    drawObjects(d);
+  }catch(err){
+    console.error(err);
+    if(req === state.req){
+      renderInfo(m, `<span class="bad">Не удалось загрузить точки.</span><br><span class="muted">${esc(err.message)}</span>`);
+      renderLayerControls({});
+    }
+  }
+}
+
+function drawObjects(d){
+  const groups = {};
+  for(const k in LAYER_DEFS) groups[k] = L.layerGroup();
+  const counts = {};
+  const add = (k, layer) => { groups[k].addLayer(layer); counts[k] = (counts[k]||0)+1; };
+
+  for(const p of list(d.points_of_interest)){
+    if(!p.coord) continue;
+    const k = LAYER_DEFS[p.type] ? p.type : "unlock";
+    const title = p.name || LAYER_DEFS[k].label;
+    const mk = L.marker(ll(p.coord),{icon:pinIcon(LAYER_DEFS[k], p.icon)});
+    mk.bindTooltip(title,{direction:"top",offset:[0,-12]});
+    mk.bindPopup(popupHtml(title,[LAYER_DEFS[k].label], p.chat_link));
+    add(k, mk);
+  }
+
+  for(const t of list(d.tasks)){
+    if(!t.coord) continue;
+    const mk = L.marker(ll(t.coord),{icon:pinIcon(LAYER_DEFS.heart)});
+    mk.bindTooltip(t.objective || "Renown Heart",{direction:"top",offset:[0,-12]});
+    mk.bindPopup(popupHtml(t.objective || "Renown Heart",["Renown Heart · ур. "+(t.level ?? "?")], t.chat_link));
+    if(Array.isArray(t.bounds) && t.bounds.length>2){
+      const poly = L.polygon(t.bounds.map(ll),{color:"#e0454f",weight:1,fillOpacity:0.12,interactive:false});
+      mk.on("mouseover",()=>poly.addTo(state.map));
+      mk.on("mouseout",()=>poly.remove());
+    }
+    add("heart", mk);
+  }
+
+  for(const s of list(d.skill_challenges)){
+    if(!s.coord) continue;
+    const mk = L.marker(ll(s.coord),{icon:pinIcon(LAYER_DEFS.skill)});
+    mk.bindTooltip("Hero Challenge",{direction:"top",offset:[0,-12]});
+    mk.bindPopup(popupHtml("Hero Challenge",["Skill point"]));
+    add("skill", mk);
+  }
+
+  for(const s of list(d.sectors)){
+    if(!s.coord || !s.name) continue;
+    const mk = L.marker(ll(s.coord),{interactive:false,icon:L.divIcon({className:"sector-label",html:`<span>${esc(s.name)}</span>`,iconSize:[0,0]})});
+    add("sector", mk);
+  }
+
+  state.groups = groups;
+  applyVisibility();
+  renderLayerControls(counts);
+  const total = Object.entries(counts).filter(([k])=>k!=="sector").reduce((a,[,n])=>a+n,0);
+  renderInfo(state.selected, `Объектов на карте: <b>${total}</b>`);
 }
 
 async function load(){
-  $("info").innerHTML="Загрузка карт…";
+  $("info").innerHTML = "Загрузка карт…";
   try{
-    // IMPORTANT: /v2/worlds without ids returns only IDs. We no longer use worlds at all,
-    // because PvE uses megaserver and a server selector is misleading.
     const maps = await getJSON(`${API}/maps?ids=all&lang=en`);
     if(!Array.isArray(maps)) throw new Error("Unexpected /v2/maps response");
     state.maps = maps.filter(mapIsZoneLike);
     renderZoneList();
   }catch(err){
     console.error(err);
-    $("info").innerHTML=`<span class="bad">Не удалось загрузить карты.</span><div class="small muted">${esc(err.message)}</div>`;
-    $("zone").innerHTML='<option>Ошибка API</option>';
+    $("info").innerHTML = `<span class="bad">Не удалось загрузить карты.</span><div class="small muted">${esc(err.message)}</div>`;
+    $("zone").innerHTML = '<option>Ошибка API</option>';
   }
 }
 
-$("continent").addEventListener("change",renderZoneList);
+$("continent").addEventListener("change",()=>{ state.selected=null; renderZoneList(); });
 $("zone").addEventListener("change",e=>selectZone(e.target.value));
 $("search").addEventListener("input",renderZoneList);
-$("reload").addEventListener("click",load);
+$("layers").addEventListener("change",e=>{
+  const k = e.target.dataset.k;
+  if(!k) return;
+  state.vis[k] = e.target.checked;
+  applyVisibility();
+});
+$("reload").addEventListener("click",async ()=>{
+  state.cache = {};
+  const cur = state.selected ? state.selected.id : null;
+  await load();
+  if(cur) selectZone(cur);
+});
 
+initMap();
 load();
 </script>
 </body>
